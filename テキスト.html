@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>🌳 樹木点検システム（完全版）</title>
+  <!-- SheetJS -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', sans-serif; background: #f4f6f0; color: #1a1a1a; padding-bottom: 30px; }
+    .hdr { background: linear-gradient(145deg, #1e3a0e, #2d5016); color: white; padding: 18px 16px; border-radius: 0 0 28px 28px; }
+    .tabs { display: flex; gap: 6px; margin: 16px 12px; background: white; padding: 6px; border-radius: 50px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .tab-btn { flex:1; padding: 10px; border: none; background: transparent; border-radius: 40px; font-weight: 600; cursor: pointer; }
+    .tab-btn.active { background: #4a7c2f; color: white; }
+    .content { padding: 0 12px; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .card { background: white; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
+    .card-hdr { padding: 14px 18px; font-weight: 700; background: #e8f3df; border-bottom: 2px solid rgba(0,0,0,0.05); display: flex; align-items: center; gap: 10px; }
+    .card-hdr.brown { background: #f3ede5; }
+    .card-hdr.blue { background: #e3f2fd; }
+    .sn { background: #2d5016; color: white; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 10px; }
+    .card-body { padding: 16px; }
+    .frow { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+    .c2 > * { flex: 1 1 calc(50% - 6px); min-width: 140px; }
+    .fg { display: flex; flex-direction: column; }
+    .lbl { font-weight: 600; font-size: 0.9rem; margin-bottom: 5px; color: #555; display: flex; align-items: center; gap: 4px; }
+    .req { color: #c62828; margin-left: 3px; }
+    .inp { padding: 12px 14px; border: 1.5px solid #ddd; border-radius: 14px; font-size: 1rem; background: #fdfdfd; }
+    .rgroup { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 5px; }
+    .rbtn { flex: 1 0 70px; padding: 8px 4px; background: #f2f2f2; border: 1.5px solid #ccc; border-radius: 30px; font-weight: 600; font-size: 0.9rem; cursor: pointer; text-align: center; line-height: 1.3; transition: all 0.1s; }
+    .rbtn.sel { background: #4a7c2f; border-color: #2d5016; color: white; }
+    .rbtn small { display: block; font-weight: 400; font-size: 0.65rem; opacity: 0.85; margin-top: 2px; }
+    .btn-pri { background: #2d5016; color: white; border: none; padding: 16px; border-radius: 50px; font-weight: 700; font-size: 1.2rem; width: 100%; cursor: pointer; }
+    .btn-sec { background: #eee; border: 1px solid #bbb; padding: 12px; border-radius: 40px; font-weight: 600; cursor: pointer; }
+    .submit-area { display: flex; gap: 12px; margin: 20px 0; flex-wrap: wrap; }
+    .photo-area { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+    .photo-item { position: relative; width: 90px; height: 90px; }
+    .photo-thumb { width: 100%; height: 100%; object-fit: cover; border-radius: 16px; border: 2px solid #ccc; background: #eee; }
+    .photo-del { position: absolute; top: -5px; right: -5px; background: #c62828; color: white; border: none; width: 26px; height: 26px; border-radius: 50%; font-weight: bold; cursor: pointer; }
+    .grade-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-weight: 700; }
+    .grade-A { background: #2e7d32; color: white; }
+    .grade-B { background: #f9a825; color: black; }
+    .grade-C { background: #e65100; color: white; }
+    .grade-D { background: #b71c1c; color: white; }
+    .record-item { background: white; border-radius: 20px; padding: 16px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .search-bar { display: flex; gap: 8px; margin-bottom: 16px; }
+    .record-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    .btn-small { padding: 6px 14px; border-radius: 30px; border: none; background: #e0e0e0; font-weight: 500; cursor: pointer; }
+    @media print {
+      body { background: white; padding: 0; }
+      .hdr, .tabs, .submit-area, .photo-del, .btn-sec, .btn-pri, .search-bar, .record-actions, .tab-btn { display: none !important; }
+      .card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+      .content { padding: 0; }
+      .tab-panel { display: block !important; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="hdr">
+  <h1>🌲 樹木点検・診断</h1>
+  <div class="sub">全項目出力対応版</div>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="inspect">📋 点検入力</button>
+  <button class="tab-btn" data-tab="records">📚 記録一覧</button>
+  <button class="tab-btn" data-tab="guide">📖 判定基準</button>
+</div>
+
+<div class="content">
+  <!-- 点検入力タブ -->
+  <div class="tab-panel active" id="tab-inspect">
+    <div class="card">
+      <div class="card-hdr green"><span class="sn">Ⅰ-1</span>基本情報・位置</div>
+      <div class="card-body">
+        <div class="frow c2">
+          <div class="fg"><label class="lbl">樹木No.<span class="req">*</span></label><input class="inp" id="treeNo" placeholder="例：S-001"></div>
+          <div class="fg"><label class="lbl">調査日<span class="req">*</span></label><input type="date" class="inp" id="surveyDate"></div>
+          <div class="fg"><label class="lbl">天候</label><select class="inp" id="weather"><option>晴れ</option><option>曇り</option><option>雨</option></select></div>
+          <div class="fg"><label class="lbl">調査者<span class="req">*</span></label><input class="inp" id="inspector"></div>
+        </div>
+        <div class="frow c2">
+          <div class="fg"><label class="lbl">樹種名<span class="req">*</span></label><input class="inp" id="species"></div>
+          <div class="fg"><label class="lbl">科名</label><input class="inp" id="family"></div>
+          <div class="fg"><label class="lbl">学名</label><input class="inp" id="scientificName"></div>
+          <div class="fg"><label class="lbl">愛称</label><input class="inp" id="nickname"></div>
+        </div>
+        <div class="fg"><label class="lbl">所在地</label><input class="inp" id="location" placeholder="例：○○市△△公園"></div>
+        <div class="frow c2" style="margin-top:12px;">
+          <div class="fg"><label class="lbl">樹高 (m)</label><input type="number" step="0.1" class="inp" id="treeHeight"></div>
+          <div class="fg"><label class="lbl">幹周 (cm)</label><input type="number" class="inp" id="trunkGirth"></div>
+        </div>
+        <div class="frow c2">
+          <div class="fg"><label class="lbl">緯度</label><input class="inp" id="latitude" placeholder="例：35.123456" step="any"></div>
+          <div class="fg"><label class="lbl">経度</label><input class="inp" id="longitude" placeholder="例：139.123456" step="any"></div>
+        </div>
+        <button id="gpsButton" onclick="getGPS()" style="margin-top:8px;padding:10px 16px;background:#4a7c2f;color:#fff;border:none;border-radius:40px;font-weight:600;cursor:pointer;">📍 現在位置を取得</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr brown"><span class="sn">Ⅰ-2</span>活力度（衰退度）</div>
+      <div class="card-body" id="decline-items"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr blue"><span class="sn">Ⅰ-3</span>健全度（外観評価）</div>
+      <div class="card-body" id="health-items"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr brown"><span class="sn">🍄</span>腐朽菌</div>
+      <div class="card-body">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          <label><input type="checkbox" value="ベッコウタケ" class="fungus-check"> ベッコウタケ</label>
+          <label><input type="checkbox" value="コフキサルノコシカケ" class="fungus-check"> コフキサルノコシカケ</label>
+          <label><input type="checkbox" value="カワラタケ" class="fungus-check"> カワラタケ</label>
+          <label><input type="checkbox" value="カイメンタケ" class="fungus-check"> カイメンタケ</label>
+          <label><input type="checkbox" value="その他" class="fungus-check"> その他</label>
+        </div>
+        <input class="inp" id="fungusOther" placeholder="その他のキノコ名" style="margin-top:8px;">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr green">📸 写真記録</div>
+      <div class="card-body">
+        <input type="file" id="photoInput" accept="image/*" multiple style="display:none;">
+        <div style="display:flex;gap:8px;">
+          <button class="btn-sec" onclick="takePhoto()">📷 カメラ</button>
+          <button class="btn-sec" onclick="selectFromAlbum()">🖼️ アルバム</button>
+        </div>
+        <div id="photoContainer" class="photo-area"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr green">📊 総合判定</div>
+      <div class="card-body">
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">
+          <span style="font-size:2.5rem;font-weight:800;" id="overallGradeDisplay">-</span>
+          <span id="overallLevelDisplay" style="font-weight:600;"></span>
+        </div>
+        <textarea class="inp" id="overallComment" rows="3" placeholder="総合所見"></textarea>
+        <div style="margin-top:12px;">
+          <label class="lbl">必要な措置</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            <label><input type="checkbox" value="伐採" class="measure-check"> 伐採</label><label><input type="checkbox" value="剪定" class="measure-check"> 剪定</label>
+            <label><input type="checkbox" value="支柱補修" class="measure-check"> 支柱補修</label><label><input type="checkbox" value="土壌改良" class="measure-check"> 土壌改良</label>
+            <label><input type="checkbox" value="施肥" class="measure-check"> 施肥</label><label><input type="checkbox" value="薬剤処理" class="measure-check"> 薬剤処理</label>
+            <label><input type="checkbox" value="経過観察" class="measure-check"> 経過観察</label>
+          </div>
+        </div>
+        <div class="submit-area">
+          <button class="btn-pri" onclick="saveRecord()">💾 保存</button>
+          <button class="btn-sec" onclick="resetForm()">🔄 リセット</button>
+          <button class="btn-sec" onclick="exportToExcel()">📊 Excel出力</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 記録一覧タブ -->
+  <div class="tab-panel" id="tab-records">
+    <div class="card">
+      <div class="card-body">
+        <div class="search-bar">
+          <input type="text" class="inp" id="searchInput" placeholder="樹種・場所・点検者で検索">
+          <select class="inp" id="sortSelect" style="max-width:140px;">
+            <option value="date-desc">日付(新→古)</option>
+            <option value="date-asc">日付(古→新)</option>
+            <option value="grade">判定順</option>
+          </select>
+        </div>
+        <div id="recordsList"></div>
+        <div style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn-sec" onclick="printInspectionPage()">🖨️ 現在画面を印刷</button>
+          <button class="btn-sec" onclick="exportAllToExcel()">📊 全件Excel出力</button>
+          <button class="btn-sec" onclick="exportAllToJSON()">📦 JSONバックアップ</button>
+          <button class="btn-sec" onclick="printRecordsTable()">📋 一覧表HTML出力</button>
+          <input type="file" id="jsonImportInput" accept=".json,application/json" style="display:none;">
+          <button class="btn-sec" onclick="document.getElementById('jsonImportInput').click()">📂 JSON復元</button>
+          <button class="btn-sec" onclick="removeInvalidRecords()" style="background:#ffcdd2;">🧹 無効記録削除</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ガイド -->
+  <div class="tab-panel" id="tab-guide">
+    <div class="card"><div class="card-body">
+      <h3>活力度 0〜4</h3><p>各項目の状態を0(最良)〜4(最悪)で評価</p>
+      <h3>健全度 A〜D</h3><p>A:異常なし B:軽微な異常 C:危険性あり D:非常に危険</p>
+    </div></div>
+  </div>
+</div>
+
+<script>
+  (function(){
+    "use strict";
+
+    let editingId = null;
+    const scores = {};
+    const healthGrades = {};
+    let photos = [];
+    let records = [];
+
+    const declineItems = [
+      { id: 'vigor', name: '樹勢', desc: ['旺盛', '幾分影響', '異常明らか', '極めて劣悪', 'ほとんど枯死'] },
+      { id: 'shape', name: '樹形', desc: ['自然樹形', '若干の乱れ', '大きく変化', '乱れ著しい', '完全に崩壊'] },
+      { id: 'density', name: '枝葉密度', desc: ['十分な量', 'やや劣る', 'やや少ない', '著しく少ない', 'ほとんど葉がない'] },
+      { id: 'shoot', name: '枝伸長量', desc: ['十分伸長', 'やや小さい', '短く細い', '極度に短小', '萌芽のみ'] },
+      { id: 'leafSize', name: '葉の大きさ', desc: ['十分な大きさ', '所々小さい', '全体にやや小', '全体に著しく小', 'わずかな葉のみ'] },
+      { id: 'leafColor', name: '葉色', desc: ['濃い緑色', 'やや薄い緑', '黄変目立つ', '大部分薄緑', '薄緑・黄変のみ'] },
+      { id: 'topDieback', name: '梢端枯損', desc: ['なし', '少し', '随所に見られる', 'かなり目立つ', '梢端・主枝なし'] },
+      { id: 'lowerDieback', name: '下枝枯損', desc: ['なし', '少し', '随所・切断目立つ', 'かなり目立つ', '健全な枝端なし'] },
+      { id: 'largeBranch', name: '大枝欠損', desc: ['なし', '少し回復', '随所に目立つ', 'かなり目立つ', '幹上部喪失'] },
+      { id: 'pruning', name: '剪定痕', desc: ['旺盛に巻込', '巻込成長', '活力なし', 'ほとんど巻込なし', '全く巻込なし'] },
+      { id: 'barkWound', name: '樹皮傷', desc: ['ほとんどなし', '少し', '古傷が残る', '腐朽著しい', '大空洞・剥がれ'] },
+      { id: 'barkTurnover', name: '新陳代謝', desc: ['活発', '一部不活発', '全体に活力なし', '著しく衰弱', '大部分壊死'] },
+      { id: 'sprout', name: '胴吹き', desc: ['なし', '枝葉量多いが胴吹きあり', '枝葉少＋胴吹きあり', '枝葉極少＋胴吹き多', '枝葉極少＋胴吹き少'] },
+      { id: 'bud', name: '芽', desc: ['大きく多数', 'やや劣る', '小さい/少ない', '著しく少なく貧弱', 'ほとんど見られない'] },
+      { id: 'autumnColor', name: '紅黄葉', desc: ['鮮やか', 'やや劣る', '一部のみ', '見られない', '正常な紅黄葉なし'] },
+      { id: 'flower', name: '開花', desc: ['花つき良好', 'やや劣る', '花小さく疎', '小さい花多く疎', 'ほとんど開花なし'] },
+      { id: 'fruit', name: '結実', desc: ['実つき良好', 'やや劣る', '実小さく疎', '小さい実多く疎', 'ほとんど結実なし'] }
+    ];
+
+    const healthItems = [
+      { id: 'sway', name: '揺らぎ' }, { id: 'lean', name: '傾斜' }, { id: 'crack', name: '亀裂' }, { id: 'cavity', name: '空洞' },
+      { id: 'bulge', name: '隆起' }, { id: 'decayExposed', name: '腐朽露出' }, { id: 'rootDamage', name: '根系損傷' }, { id: 'pavementCrack', name: '舗装亀裂' }
+    ];
+    const healthGradeDesc = { 'A':'異常なし', 'B':'軽微な異常', 'C':'危険性あり', 'D':'非常に危険' };
+
+    function buildUI() {
+      const dCont = document.getElementById('decline-items');
+      if (dCont) {
+        dCont.innerHTML = declineItems.map(item => `
+          <div class="fg"><label class="lbl">${item.name}</label>
+            <div class="rgroup">
+              ${[0,1,2,3,4].map(v => `<button class="rbtn" data-type="decline" data-id="${item.id}" data-val="${v}" onclick="setScore(this)">${v}<small>${item.desc[v]}</small></button>`).join('')}
+            </div>
+          </div>
+        `).join('');
+      }
+      const hCont = document.getElementById('health-items');
+      if (hCont) {
+        hCont.innerHTML = healthItems.map(item => `
+          <div class="fg"><label class="lbl">${item.name}</label>
+            <div class="rgroup">
+              ${['A','B','C','D'].map(g => `<button class="rbtn" data-type="health" data-id="${item.id}" data-val="${g}" onclick="setScore(this)">${g}<small>${healthGradeDesc[g]}</small></button>`).join('')}
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    window.setScore = function(btn) {
+      const type = btn.dataset.type, id = btn.dataset.id, val = btn.dataset.val;
+      const isSelected = btn.classList.contains('sel');
+      document.querySelectorAll(`[data-type="${type}"][data-id="${id}"]`).forEach(b => b.classList.remove('sel'));
+      if (isSelected) {
+        if (type === 'decline') delete scores[id];
+        else delete healthGrades[id];
+      } else {
+        btn.classList.add('sel');
+        if (type === 'decline') scores[id] = parseInt(val);
+        else healthGrades[id] = val;
+      }
+      updateOverall();
+    };
+
+    function calcAvg() {
+      let sum=0, cnt=0;
+      declineItems.forEach(i=>{ if(scores[i.id]!==undefined){ sum+=scores[i.id]; cnt++; } });
+      return cnt? sum/cnt : 0;
+    }
+    function worstHealth() {
+      const order = {A:0,B:1,C:2,D:3}; let worst='A';
+      healthItems.forEach(i=>{ const g=healthGrades[i.id]; if(g && order[g]>order[worst]) worst=g; });
+      return worst;
+    }
+    function updateOverall() {
+      const avg = calcAvg(), worst = worstHealth();
+      let grade='-', text='';
+      if(worst==='D' || scores['vigor']===4) { grade='D'; text='危険木（緊急対応）'; }
+      else if(worst==='C' || avg>=2.4) { grade='C'; text='要注意'; }
+      else if(worst==='B' || avg>=1.6) { grade='B'; text='経過観察'; }
+      else { grade='A'; text='健全'; }
+      document.getElementById('overallGradeDisplay').textContent = grade;
+      document.getElementById('overallLevelDisplay').textContent = text;
+    }
+
+    window.takePhoto = () => { const inp=document.getElementById('photoInput'); inp.setAttribute('capture','environment'); inp.click(); };
+    window.selectFromAlbum = () => { const inp=document.getElementById('photoInput'); inp.removeAttribute('capture'); inp.click(); };
+    document.getElementById('photoInput').addEventListener('change', e => {
+      Array.from(e.target.files).forEach(f => { const r=new FileReader(); r.onload=ev=>{ photos.push(ev.target.result); renderPhotos(); }; r.readAsDataURL(f); });
+      e.target.value = '';
+    });
+    function renderPhotos() {
+      const cont = document.getElementById('photoContainer');
+      if(cont) cont.innerHTML = photos.map((p,i)=> `<div class="photo-item"><img src="${p}" class="photo-thumb"><button class="photo-del" onclick="removePhoto(${i})">✕</button></div>`).join('');
+    }
+    window.removePhoto = (i) => { photos.splice(i,1); renderPhotos(); };
+
+    window.getGPS = function() {
+      if (!navigator.geolocation) { alert('非対応'); return; }
+      const btn = document.getElementById('gpsButton');
+      btn.textContent = '取得中...'; btn.disabled = true;
+      navigator.geolocation.getCurrentPosition(pos => {
+        document.getElementById('latitude').value = pos.coords.latitude.toFixed(6);
+        document.getElementById('longitude').value = pos.coords.longitude.toFixed(6);
+        btn.textContent = '📍 現在位置を取得'; btn.disabled = false;
+      }, err => { alert('取得失敗'); btn.textContent = '📍 現在位置を取得'; btn.disabled = false; });
+    };
+
+    function collectData() {
+      return {
+        id: editingId || Date.now()+'-'+Math.random().toString(36),
+        treeNo: document.getElementById('treeNo').value, surveyDate: document.getElementById('surveyDate').value,
+        weather: document.getElementById('weather').value, inspector: document.getElementById('inspector').value,
+        species: document.getElementById('species').value, family: document.getElementById('family').value,
+        scientificName: document.getElementById('scientificName').value, nickname: document.getElementById('nickname').value,
+        location: document.getElementById('location').value, treeHeight: document.getElementById('treeHeight').value,
+        trunkGirth: document.getElementById('trunkGirth').value, latitude: document.getElementById('latitude').value,
+        longitude: document.getElementById('longitude').value, scores: {...scores}, health: {...healthGrades},
+        fungus: [...document.querySelectorAll('.fungus-check:checked')].map(c=>c.value),
+        fungusOther: document.getElementById('fungusOther').value, comment: document.getElementById('overallComment').value,
+        measures: [...document.querySelectorAll('.measure-check:checked')].map(c=>c.value), photos: [...photos],
+        avg: calcAvg(), worstHealth: worstHealth(), overall: document.getElementById('overallGradeDisplay').textContent
+      };
+    }
+
+    window.saveRecord = () => {
+      if(!document.getElementById('treeNo').value || !document.getElementById('surveyDate').value || !document.getElementById('inspector').value || !document.getElementById('species').value) {
+        alert('必須項目を入力'); return;
+      }
+      const data = collectData();
+      if(editingId) {
+        const idx = records.findIndex(r => r.id === editingId);
+        if(idx !== -1) records[idx] = data;
+        editingId = null;
+      } else records.unshift(data);
+      localStorage.setItem('treeRecords', JSON.stringify(records));
+      alert('✅ 保存しました');
+      resetForm();
+      renderRecordsList();
+      showTab('records');
+    };
+
+    window.resetForm = function() {
+      if (!confirm('リセットしますか？')) return;
+      document.getElementById('treeNo').value = '';
+      document.getElementById('surveyDate').value = new Date().toISOString().split('T')[0];
+      document.getElementById('weather').value = '晴れ';
+      document.getElementById('inspector').value = '';
+      document.getElementById('species').value = '';
+      document.getElementById('family').value = '';
+      document.getElementById('scientificName').value = '';
+      document.getElementById('nickname').value = '';
+      document.getElementById('location').value = '';
+      document.getElementById('treeHeight').value = '';
+      document.getElementById('trunkGirth').value = '';
+      document.getElementById('latitude').value = '';
+      document.getElementById('longitude').value = '';
+      document.getElementById('overallComment').value = '';
+      document.getElementById('fungusOther').value = '';
+      Object.keys(scores).forEach(k => delete scores[k]);
+      Object.keys(healthGrades).forEach(k => delete healthGrades[k]);
+      document.querySelectorAll('.rbtn').forEach(b => b.classList.remove('sel'));
+      photos = []; renderPhotos();
+      document.querySelectorAll('.fungus-check').forEach(cb => cb.checked = false);
+      document.querySelectorAll('.measure-check').forEach(cb => cb.checked = false);
+      updateOverall();
+      editingId = null;
+    };
+
+    function renderRecordsList() {
+      const valid = records.filter(r => r && r.id);
+      const q = document.getElementById('searchInput').value.toLowerCase();
+      let filtered = valid.filter(r => (r.species||'').toLowerCase().includes(q) || (r.location||'').toLowerCase().includes(q) || (r.inspector||'').toLowerCase().includes(q));
+      const sort = document.getElementById('sortSelect').value;
+      if(sort === 'date-desc') filtered.sort((a,b)=> (a.surveyDate<b.surveyDate?1:-1));
+      else if(sort === 'date-asc') filtered.sort((a,b)=> (a.surveyDate>b.surveyDate?1:-1));
+      else if(sort === 'grade') { const o={A:1,B:2,C:3,D:4}; filtered.sort((a,b)=>(o[a.overall]||5)-(o[b.overall]||5)); }
+      document.getElementById('recordsList').innerHTML = filtered.map(r => `
+        <div class="record-item">
+          <div style="display:flex;justify-content:space-between;"><strong>${r.species} (${r.treeNo})</strong><span class="grade-badge grade-${r.overall}">${r.overall}</span></div>
+          <div>📍 ${r.location} 📅 ${r.surveyDate}</div><div>👤 ${r.inspector}</div>
+          <div class="record-actions">
+            <button class="btn-small" onclick="editRecord('${r.id}')">✏️ 編集</button>
+            <button class="btn-small" onclick="deleteRecord('${r.id}')">🗑️ 削除</button>
+            <button class="btn-small" onclick="printRecord('${r.id}')">🖨️ 詳細印刷</button>
+            <button class="btn-small" onclick="exportSingleToExcel('${r.id}')">📊 Excel</button>
+          </div>
+        </div>
+      `).join('') || '<p>記録がありません</p>';
+    }
+
+    window.editRecord = (id) => {
+      const r = records.find(r=>r.id===id); if(!r) return;
+      editingId = r.id;
+      document.getElementById('treeNo').value = r.treeNo||'';
+      document.getElementById('surveyDate').value = r.surveyDate||'';
+      document.getElementById('weather').value = r.weather||'晴れ';
+      document.getElementById('inspector').value = r.inspector||'';
+      document.getElementById('species').value = r.species||'';
+      document.getElementById('family').value = r.family||'';
+      document.getElementById('scientificName').value = r.scientificName||'';
+      document.getElementById('nickname').value = r.nickname||'';
+      document.getElementById('location').value = r.location||'';
+      document.getElementById('treeHeight').value = r.treeHeight||'';
+      document.getElementById('trunkGirth').value = r.trunkGirth||'';
+      document.getElementById('latitude').value = r.latitude||'';
+      document.getElementById('longitude').value = r.longitude||'';
+      document.getElementById('overallComment').value = r.comment||'';
+      document.getElementById('fungusOther').value = r.fungusOther||'';
+      Object.keys(r.scores||{}).forEach(k=> scores[k]=r.scores[k]);
+      Object.keys(r.health||{}).forEach(k=> healthGrades[k]=r.health[k]);
+      document.querySelectorAll('.rbtn').forEach(b=>b.classList.remove('sel'));
+      declineItems.forEach(it=>{ if(scores[it.id]!==undefined) document.querySelector(`[data-type="decline"][data-id="${it.id}"][data-val="${scores[it.id]}"]`)?.classList.add('sel'); });
+      healthItems.forEach(it=>{ if(healthGrades[it.id]) document.querySelector(`[data-type="health"][data-id="${it.id}"][data-val="${healthGrades[it.id]}"]`)?.classList.add('sel'); });
+      photos = r.photos||[]; renderPhotos();
+      document.querySelectorAll('.fungus-check').forEach(cb=> cb.checked = (r.fungus||[]).includes(cb.value));
+      document.querySelectorAll('.measure-check').forEach(cb=> cb.checked = (r.measures||[]).includes(cb.value));
+      updateOverall();
+      showTab('inspect');
+    };
+
+    window.deleteRecord = function(id) {
+      if (!confirm('削除しますか？')) return;
+      records = records.filter(r => r.id !== id);
+      localStorage.setItem('treeRecords', JSON.stringify(records));
+      renderRecordsList();
+    };
+
+    window.removeInvalidRecords = () => { records = records.filter(r => r && r.id); localStorage.setItem('treeRecords', JSON.stringify(records)); renderRecordsList(); alert('無効記録削除'); };
+
+    // 詳細印刷（全項目HTML出力）
+    window.printRecord = function(id) {
+      const r = records.find(r => r.id === id);
+      if (!r) return;
+      const declineRows = declineItems.map(it => {
+        const val = r.scores?.[it.id] ?? '-';
+        const desc = (val !== '-' && it.desc) ? it.desc[val] : '';
+        return `<tr><td>${it.name}</td><td>${val}</td><td>${desc}</td></tr>`;
+      }).join('');
+      const healthRows = healthItems.map(it => {
+        const val = r.health?.[it.id] ?? '-';
+        const desc = val !== '-' ? healthGradeDesc[val] : '';
+        return `<tr><td>${it.name}</td><td>${val}</td><td>${desc}</td></tr>`;
+      }).join('');
+      const fungusList = [...(r.fungus || []), r.fungusOther].filter(Boolean).join('、') || '確認なし';
+      const photoHtml = (r.photos && r.photos.length) ? r.photos.map(p => `<img src="${p}" style="max-width:200px;max-height:150px;margin:5px;">`).join('') : '<p>写真なし</p>';
+      const measures = (r.measures && r.measures.length) ? r.measures.join('、') : 'なし';
+      const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>報告書_${r.treeNo}</title><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP&display=swap" rel="stylesheet"><style>body{font-family:'Noto Sans JP';padding:20px;} table{border-collapse:collapse;width:100%;} th,td{border:1px solid #333;padding:8px;}</style></head><body><h2>樹木点検報告書</h2><h3>${r.treeNo} ${r.species} (${r.surveyDate})</h3><p>所在地: ${r.location} / 調査者: ${r.inspector} / 天候: ${r.weather}</p><p>樹高: ${r.treeHeight}m / 幹周: ${r.trunkGirth}cm / GPS: ${r.latitude},${r.longitude}</p><h4>活力度</h4><table>${declineRows}</table><p>平均: ${r.avg?.toFixed(2)}</p><h4>健全度</h4><table>${healthRows}</table><p>最悪: ${r.worstHealth}</p><h4>腐朽菌</h4><p>${fungusList}</p><h4>写真</h4>${photoHtml}<h4>総合判定: ${r.overall}</h4><p>所見: ${r.comment}</p><p>必要な措置: ${measures}</p></body></html>`;
+      const blob = new Blob([html], {type: 'text/html'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `報告書_${r.treeNo}.html`; a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    window.printRecordsTable = function() {
+      const rows = records.filter(r=>r.id).map(r => `<tr><td>${r.surveyDate}</td><td>${r.treeNo}</td><td>${r.species}</td><td>${r.location}</td><td>${r.inspector}</td><td>${r.treeHeight}</td><td>${r.trunkGirth}</td><td>${r.overall}</td><td>${r.comment||''}</td><td>${(r.measures||[]).join('、')}</td></tr>`).join('');
+      const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>一覧表</title><style>body{font-family:sans-serif;padding:20px;} table{border-collapse:collapse;} th,td{border:1px solid #333;padding:8px;}</style></head><body><h2>樹木点検一覧</h2><table><tr><th>調査日</th><th>No</th><th>樹種</th><th>場所</th><th>点検者</th><th>樹高</th><th>幹周</th><th>判定</th><th>所見</th><th>措置</th></tr>${rows}</table></body></html>`;
+      const blob = new Blob([html], {type: 'text/html'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = '一覧表.html'; a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    window.printInspectionPage = () => window.print();
+
+    // 全項目を含むExcel生成
+    function createFullExcelBlob(data) {
+      const wb = XLSX.utils.book_new();
+      const base = [
+        ['樹木No', data.treeNo], ['調査日', data.surveyDate], ['天候', data.weather], ['調査者', data.inspector],
+        ['樹種', data.species], ['科名', data.family], ['学名', data.scientificName], ['愛称', data.nickname],
+        ['所在地', data.location], ['樹高(m)', data.treeHeight], ['幹周(cm)', data.trunkGirth],
+        ['緯度', data.latitude], ['経度', data.longitude], ['総合判定', data.overall], ['所見', data.comment],
+        ['腐朽菌', [...(data.fungus||[]), data.fungusOther].filter(Boolean).join('、')],
+        ['必要な措置', (data.measures||[]).join('、')]
+      ];
+      const sheet1 = XLSX.utils.aoa_to_sheet(base);
+      XLSX.utils.book_append_sheet(wb, sheet1, '基本情報');
+      const sheet2 = XLSX.utils.aoa_to_sheet([['活力度項目','評点'], ...declineItems.map(it=>[it.name, data.scores?.[it.id]??'']), ['平均', data.avg]]);
+      XLSX.utils.book_append_sheet(wb, sheet2, '活力度');
+      const sheet3 = XLSX.utils.aoa_to_sheet([['健全度項目','評価'], ...healthItems.map(it=>[it.name, data.health?.[it.id]??'']), ['最悪', data.worstHealth]]);
+      XLSX.utils.book_append_sheet(wb, sheet3, '健全度');
+      return new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], {type: 'application/octet-stream'});
+    }
+
+    function dlBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    window.exportToExcel = () => {
+      const data = collectData();
+      if (!data.treeNo) { alert('樹木Noを入力'); return; }
+      dlBlob(createFullExcelBlob(data), `診断_${data.treeNo}.xlsx`);
+    };
+    window.exportSingleToExcel = (id) => {
+      const r = records.find(r=>r.id===id); if(!r) return;
+      dlBlob(createFullExcelBlob(r), `診断_${r.treeNo}.xlsx`);
+    };
+    window.exportAllToExcel = () => {
+      if (!records.filter(r=>r.id).length) { alert('データなし'); return; }
+      const wb = XLSX.utils.book_new();
+      // 個別シート
+      records.filter(r=>r.id).forEach(r => {
+        const base = [
+          ['樹木No', r.treeNo], ['調査日', r.surveyDate], ['天候', r.weather], ['調査者', r.inspector],
+          ['樹種', r.species], ['科名', r.family], ['学名', r.scientificName], ['愛称', r.nickname],
+          ['所在地', r.location], ['樹高(m)', r.treeHeight], ['幹周(cm)', r.trunkGirth],
+          ['緯度', r.latitude], ['経度', r.longitude], ['総合判定', r.overall], ['所見', r.comment],
+          ['腐朽菌', [...(r.fungus||[]), r.fungusOther].filter(Boolean).join('、')],
+          ['必要な措置', (r.measures||[]).join('、')]
+        ];
+        const sheet = XLSX.utils.aoa_to_sheet(base);
+        XLSX.utils.book_append_sheet(wb, sheet, r.treeNo || r.id);
+      });
+      // 一覧表（樹高・幹周・所見・措置追加）
+      const summaryRows = [['調査日','樹木No','樹種','場所','点検者','樹高','幹周','判定','所見','必要な措置']];
+      records.filter(r=>r.id).forEach(r => summaryRows.push([r.surveyDate, r.treeNo, r.species, r.location, r.inspector, r.treeHeight, r.trunkGirth, r.overall, r.comment, (r.measures||[]).join('、')]));
+      const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows);
+      XLSX.utils.book_append_sheet(wb, summarySheet, '一覧表');
+      dlBlob(new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], {type: 'application/octet-stream'}), '全件樹木診断.xlsx');
+    };
+
+    window.exportAllToJSON = () => {
+      if (!records.filter(r=>r.id).length) { alert('データなし'); return; }
+      dlBlob(new Blob([JSON.stringify(records.filter(r=>r.id), null, 2)], {type: 'application/json'}), 'backup.json');
+    };
+
+    // JSON読み込み修正
+    document.getElementById('jsonImportInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        try {
+          const imported = JSON.parse(ev.target.result);
+          if (Array.isArray(imported)) {
+            if (confirm('現在の記録をインポートしたデータで上書きしますか？')) {
+              records = imported.filter(r => r && r.id);
+              localStorage.setItem('treeRecords', JSON.stringify(records));
+              renderRecordsList();
+              alert('復元が完了しました。');
+            }
+          } else { alert('無効なJSONファイルです。'); }
+        } catch (ex) { alert('JSONの解析に失敗しました。'); }
+        e.target.value = '';
+      };
+      reader.readAsText(file, 'UTF-8');
+    });
+
+    function showTab(tab) {
+      document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+      document.getElementById(`tab-${tab}`).classList.add('active');
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+      if(tab==='records') renderRecordsList();
+    }
+    window.showTab = showTab;
+
+    function init() {
+      buildUI();
+      const saved = localStorage.getItem('treeRecords'); if(saved) { try { records = JSON.parse(saved); } catch(e){} }
+      records = records.filter(r => r && r.id);
+      document.getElementById('surveyDate').value = new Date().toISOString().split('T')[0];
+      document.querySelectorAll('.tab-btn').forEach(b=>b.addEventListener('click', ()=>showTab(b.dataset.tab)));
+      document.getElementById('searchInput').addEventListener('input', renderRecordsList);
+      document.getElementById('sortSelect').addEventListener('change', renderRecordsList);
+      renderPhotos();
+      updateOverall();
+    }
+    init();
+  })();
+</script>
+</body>
+</html>
